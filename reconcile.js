@@ -5,14 +5,31 @@
 
 const fs = require("fs");
 
+// Latest attempt per txn_id, by ts.
+const latest = new Map();
+
+const lines = fs.readFileSync("payments.jsonl", "utf8").split("\n").filter((l) => l.trim().length > 0);
+for (const line of lines) {
+  let event;
+  try {
+    event = JSON.parse(line);
+  } catch {
+    continue; }
+  if (!event || !event.txn_id) continue;
+
+  const ts = Date.parse(event.ts);
+  const prev = latest.get(event.txn_id);
+  if (!prev || ts > prev.ts) {
+    latest.set(event.txn_id, { status: event.status, amount: event.amount, ts });
+  }
+}
+
 let total = 0;
 let count = 0;
 
-const lines = fs.readFileSync("payments.jsonl", "utf8").split("\n").filter((l) => l.length > 0);
-for (const line of lines) {
-  const event = JSON.parse(line);
+for (const event of latest.values()) {
   if (event.status === "success") {
-    total += Number(event.amount);
+    total += Number(String(event.amount).replace(/,/g, ""));
     count += 1;
   }
 }
